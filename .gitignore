@@ -1,0 +1,4 @@
+.env
+roster.json
+__pycache__/
+*.pyc
