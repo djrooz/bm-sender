@@ -112,6 +112,53 @@ def get_transcripts(
     return meetings
 
 
+TRANSCRIPT_QUERY = """
+query Transcript($id: String!) {
+  transcript(id: $id) {
+    id
+    title
+    sentences {
+      speaker_name
+      text
+      start_time
+    }
+  }
+}
+"""
+
+
+def _format_time(seconds: float) -> str:
+    total = int(seconds or 0)
+    h, rem = divmod(total, 3600)
+    m, s = divmod(rem, 60)
+    return f"{h:02d}:{m:02d}:{s:02d}"
+
+
+def get_full_transcript(meeting_id: str) -> str:
+    """Полный текст встречи (реплики спикеров) — для случаев, когда summary
+    Fireflies недостаточно точен/подробен и нужно свериться с оригиналом."""
+    api_key = config.require("FIREFLIES_API_KEY", config.FIREFLIES_API_KEY)
+    resp = requests.post(
+        API_URL,
+        headers={
+            "Authorization": f"Bearer {api_key}",
+            "Content-Type": "application/json",
+        },
+        json={"query": TRANSCRIPT_QUERY, "variables": {"id": meeting_id}},
+        timeout=60,
+    )
+    resp.raise_for_status()
+    payload = resp.json()
+    if "errors" in payload and payload["errors"]:
+        raise RuntimeError(f"Fireflies API error: {payload['errors']}")
+    sentences = (payload["data"]["transcript"] or {}).get("sentences") or []
+    lines = [
+        f"[{_format_time(s.get('start_time'))}] {s.get('speaker_name') or 'Speaker'}: {s.get('text') or ''}"
+        for s in sentences
+    ]
+    return "\n".join(lines)
+
+
 def _name_variants(fio: str) -> list[str]:
     """'Волов Илья' -> ['Волов Илья', 'Илья Волов'] для поиска в title."""
     parts = fio.split()
