@@ -5,8 +5,8 @@
  * "всем по ссылке", читаем её по ID через openById, поэтому скрипт можно
  * завести под любым Google-аккаунтом, не обязательно тем же, что владеет
  * таблицей). Делает то же самое, что и Python-пайплайн в d:\BM\Sender:
- *   таблица участников -> Fireflies (полный транскрипт) -> Claude API
- *   (пишет отчёт по стилю CLAUDE.md) -> Telegram.
+ *   таблица участников -> Fireflies (полный транскрипт) -> Anthropic API
+ *   (Claude Haiku, пишет отчёт по стилю CLAUDE.md) -> Telegram.
  *
  * Настройка — см. README.md рядом с этим файлом.
  */
@@ -21,7 +21,7 @@ function getConfig_() {
     firefliesApiKey: p.getProperty('FIREFLIES_API_KEY'),
     telegramBotToken: p.getProperty('TELEGRAM_BOT_TOKEN'),
     telegramChatId: p.getProperty('TELEGRAM_CHAT_ID'),
-    openrouterApiKey: p.getProperty('OPENROUTER_API_KEY'),
+    anthropicApiKey: p.getProperty('ANTHROPIC_API_KEY'),
   };
   for (var key in cfg) {
     if (!cfg[key]) {
@@ -203,27 +203,26 @@ function writeReport_(participant, period, transcriptText) {
     'Период отчёта: ' + period + '\n\n' +
     'Полный транскрипт встречи (реплики спикеров):\n' + transcriptText;
 
-  var resp = UrlFetchApp.fetch('https://openrouter.ai/api/v1/chat/completions', {
+  var resp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
     method: 'post',
     contentType: 'application/json',
     headers: {
-      Authorization: 'Bearer ' + cfg.openrouterApiKey,
+      'x-api-key': cfg.anthropicApiKey,
+      'anthropic-version': '2023-06-01',
     },
     payload: JSON.stringify({
-      model: '~anthropic/claude-sonnet-latest',
+      model: 'claude-haiku-4-5-20251001',
       max_tokens: 1500,
-      messages: [
-        { role: 'system', content: STYLE_GUIDE },
-        { role: 'user', content: userMessage },
-      ],
+      system: STYLE_GUIDE,
+      messages: [{ role: 'user', content: userMessage }],
     }),
     muteHttpExceptions: true,
   });
   var payload = JSON.parse(resp.getContentText());
   if (payload.error) {
-    throw new Error('OpenRouter API error: ' + JSON.stringify(payload.error));
+    throw new Error('Anthropic API error: ' + JSON.stringify(payload.error));
   }
-  return payload.choices[0].message.content.trim();
+  return payload.content[0].text.trim();
 }
 
 // ===== Telegram =====
