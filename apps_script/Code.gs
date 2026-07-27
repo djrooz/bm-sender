@@ -21,7 +21,7 @@ function getConfig_() {
     firefliesApiKey: p.getProperty('FIREFLIES_API_KEY'),
     telegramBotToken: p.getProperty('TELEGRAM_BOT_TOKEN'),
     telegramChatId: p.getProperty('TELEGRAM_CHAT_ID'),
-    anthropicApiKey: p.getProperty('ANTHROPIC_API_KEY'),
+    openrouterApiKey: p.getProperty('OPENROUTER_API_KEY'),
   };
   for (var key in cfg) {
     if (!cfg[key]) {
@@ -203,26 +203,27 @@ function writeReport_(participant, period, transcriptText) {
     'Период отчёта: ' + period + '\n\n' +
     'Полный транскрипт встречи (реплики спикеров):\n' + transcriptText;
 
-  var resp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
+  var resp = UrlFetchApp.fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'post',
     contentType: 'application/json',
     headers: {
-      'x-api-key': cfg.anthropicApiKey,
-      'anthropic-version': '2023-06-01',
+      Authorization: 'Bearer ' + cfg.openrouterApiKey,
     },
     payload: JSON.stringify({
-      model: 'claude-sonnet-5',
+      model: '~anthropic/claude-sonnet-latest',
       max_tokens: 1500,
-      system: STYLE_GUIDE,
-      messages: [{ role: 'user', content: userMessage }],
+      messages: [
+        { role: 'system', content: STYLE_GUIDE },
+        { role: 'user', content: userMessage },
+      ],
     }),
     muteHttpExceptions: true,
   });
   var payload = JSON.parse(resp.getContentText());
   if (payload.error) {
-    throw new Error('Anthropic API error: ' + JSON.stringify(payload.error));
+    throw new Error('OpenRouter API error: ' + JSON.stringify(payload.error));
   }
-  return payload.content[0].text.trim();
+  return payload.choices[0].message.content.trim();
 }
 
 // ===== Telegram =====
