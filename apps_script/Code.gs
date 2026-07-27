@@ -1,13 +1,17 @@
 /**
  * BM Sender — еженедельные отчёты родителям (Google Apps Script версия).
  *
- * Привязан к гугл-таблице участников (Extensions > Apps Script внутри неё).
- * Делает то же самое, что и Python-пайплайн в d:\BM\Sender:
+ * Самостоятельный проект (НЕ привязан к самой таблице — таблица открыта
+ * "всем по ссылке", читаем её по ID через openById, поэтому скрипт можно
+ * завести под любым Google-аккаунтом, не обязательно тем же, что владеет
+ * таблицей). Делает то же самое, что и Python-пайплайн в d:\BM\Sender:
  *   таблица участников -> Fireflies (полный транскрипт) -> Claude API
  *   (пишет отчёт по стилю CLAUDE.md) -> Telegram.
  *
  * Настройка — см. README.md рядом с этим файлом.
  */
+
+var ROSTER_SHEET_ID = '1Jtgk_z0lo30QgFqwfpPuX04vZcRAmxvhpkGLC7KKfo8';
 
 // ===== Конфигурация =====
 
@@ -27,10 +31,10 @@ function getConfig_() {
   return cfg;
 }
 
-// ===== Ростер (читаем прямо из таблицы, к которой привязан скрипт) =====
+// ===== Ростер (читаем таблицу по ID — доступ по ссылке, вход не нужен) =====
 
 function getRoster_() {
-  var sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+  var sheet = SpreadsheetApp.openById(ROSTER_SHEET_ID).getSheets()[0];
   var rows = sheet.getDataRange().getValues();
   var roster = [];
   for (var i = 0; i < rows.length; i++) {
