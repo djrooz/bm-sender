@@ -6,7 +6,7 @@
  * завести под любым Google-аккаунтом, не обязательно тем же, что владеет
  * таблицей). Делает то же самое, что и Python-пайплайн в d:\BM\Sender:
  *   таблица участников -> Fireflies (полный транскрипт) -> Anthropic API
- *   (Claude Haiku, пишет отчёт по стилю CLAUDE.md) -> Telegram.
+ *   (Claude Sonnet, пишет отчёт по стилю CLAUDE.md) -> Telegram.
  *
  * Настройка — см. README.md рядом с этим файлом.
  */
@@ -573,7 +573,7 @@ function writeReport_(participant, period, transcriptText) {
       'anthropic-version': '2023-06-01',
     },
     payload: JSON.stringify({
-      model: 'claude-haiku-4-5-20251001',
+      model: 'claude-sonnet-5',
       max_tokens: 1500,
       system: STYLE_GUIDE,
       messages: [{ role: 'user', content: userMessage }],
