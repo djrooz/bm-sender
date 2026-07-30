@@ -661,6 +661,90 @@ function sendTelegramMessage_(text) {
   });
 }
 
+// ===== Тестовые функции (запускать вручную перед первым weeklyRun) =====
+
+/**
+ * Тест 1 — Telegram: отправляет тестовое сообщение в чат кураторов, чтобы
+ * проверить TELEGRAM_BOT_TOKEN и TELEGRAM_CHAT_ID. Аналог того, что мы
+ * гоняли в Python-версии (telegram_client.py: 'BM Sender: тестовое
+ * сообщение — доставка настроена.').
+ */
+function testTelegram() {
+  sendTelegramMessage_('BM Sender (Apps Script): тестовое сообщение — доставка настроена.');
+  Logger.log('OK: тестовое сообщение отправлено в Telegram.');
+}
+
+/**
+ * Тест 2 — Fireflies: только считает и логирует встречи за последние 7
+ * дней, ничего никуда не отправляет. Проверяет FIREFLIES_API_KEY и то,
+ * что список встреч вообще приходит.
+ */
+function testFireflies() {
+  var toDate = new Date();
+  var fromDate = new Date(toDate.getTime() - 7 * 24 * 60 * 60 * 1000);
+  var meetings = getTranscriptsList_(fromDate, toDate);
+  Logger.log('OK: найдено встреч за 7 дней: ' + meetings.length);
+  meetings.slice(0, 10).forEach(function (m) {
+    Logger.log(m.date + ' | ' + m.title);
+  });
+}
+
+/**
+ * Тест 3 — таблица участников: читает ростер по ROSTER_SHEET_ID и
+ * логирует всех, кого нашёл. Проверяет, что таблица доступна по ссылке.
+ */
+function testRoster() {
+  var roster = getRoster_();
+  Logger.log('OK: участников в таблице: ' + roster.length);
+  roster.forEach(function (p) {
+    Logger.log(p.fio + ' | ' + p.parents + ' | ' + p.messenger);
+  });
+}
+
+/**
+ * Тест 4 — сгенерировать отчёт по ОДНОМУ конкретному участнику за заданный
+ * период, БЕЗ отправки в Telegram. Текст черновика появляется в логе
+ * (View -> Logs, либо Ctrl+Enter в редакторе) — так можно проверить
+ * качество текста перед тем, как доверить это авто-рассылке.
+ *
+ * Впишите нужные ФИО (как в таблице) и период ниже и запустите функцию.
+ */
+function testGenerateReport() {
+  var fio = 'Волов Илья'; // <- впишите ФИО из таблицы участников
+  var dateFrom = new Date('2026-07-17'); // <- начало периода
+  var dateTo = new Date('2026-07-24'); // <- конец периода
+
+  var roster = getRoster_();
+  var participant = roster.filter(function (p) { return p.fio === fio; })[0];
+  if (!participant) {
+    Logger.log('Не нашёл в таблице участника с ФИО: ' + fio);
+    return;
+  }
+
+  var period = formatPeriod_(dateFrom, dateTo);
+  var allMeetings = getTranscriptsList_(dateFrom, dateTo);
+  var meetings = findMeetingsFor_(fio, allMeetings);
+  Logger.log('Встреч найдено за период: ' + meetings.length);
+  meetings.forEach(function (m) { Logger.log(m.date + ' | ' + m.title); });
+
+  var transcriptParts = [];
+  meetings.forEach(function (m) {
+    var text = getFullTranscript_(m.id);
+    if (text && text.length > 50) {
+      transcriptParts.push('=== ' + m.title + ' (' + m.date + ') ===\n' + text);
+    }
+  });
+
+  if (transcriptParts.length === 0) {
+    Logger.log('Нет содержательных транскриптов за этот период — отчёт не сгенерирован.');
+    return;
+  }
+
+  var reportText = writeReport_(participant, period, transcriptParts.join('\n\n'));
+  Logger.log('----- ЧЕРНОВИК ОТЧЁТА (НЕ отправлен в Telegram) -----');
+  Logger.log(reportText);
+}
+
 // ===== Основной процесс =====
 
 function formatPeriod_(fromDate, toDate) {
