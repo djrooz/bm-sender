@@ -629,7 +629,7 @@ function writeReport_(participant, period, transcriptText) {
     },
     payload: JSON.stringify({
       model: 'claude-sonnet-5',
-      max_tokens: 1500,
+      max_tokens: 8000,
       system: STYLE_GUIDE,
       messages: [{ role: 'user', content: userMessage }],
     }),
@@ -642,7 +642,7 @@ function writeReport_(participant, period, transcriptText) {
   try {
     payload = JSON.parse(responseText);
   } catch (e) {
-    throw new Error('Anthropic API вернул не-JSON ответ (HTTP ' + code + '): ' + responseText.substring(0, 1000));
+    throw new Error('Anthropic API вернул не-JSON ответ (HTTP ' + code + '): ' + responseText.substring(0, 2000));
   }
 
   if (payload.error) {
@@ -654,7 +654,7 @@ function writeReport_(participant, period, transcriptText) {
     return b && b.type === 'text' && typeof b.text === 'string';
   });
   if (textBlocks.length === 0) {
-    throw new Error('В ответе Anthropic API нет блока text (HTTP ' + code + '): ' + responseText.substring(0, 1000));
+    throw new Error('В ответе Anthropic API нет блока text (HTTP ' + code + ', stop_reason=' + payload.stop_reason + '): ' + responseText.substring(0, 2000));
   }
   return textBlocks.map(function (b) { return b.text; }).join('\n').trim();
 }
