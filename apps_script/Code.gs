@@ -589,6 +589,7 @@ var STYLE_GUIDE_RULES = [
   "неподтверждённых дат и обещаний? (полный чек-лист — см. п.31)",
   "",
 ].join('\n');
+
 var STYLE_GUIDE = STYLE_GUIDE_RULES + '\n\n' + [
   '---',
   '',
