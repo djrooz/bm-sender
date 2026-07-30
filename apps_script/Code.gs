@@ -628,14 +628,12 @@ var STYLE_GUIDE = STYLE_GUIDE_RULES + '\n\n' + [
   '<1-2 абзаца: конкретный, подтверждённый следующий шаг>',
 ].join('\n');
 
-function writeReport_(participant, period, transcriptText) {
+/**
+ * Общий вызов Anthropic API с системным промптом STYLE_GUIDE.
+ * Используется и для черновика, и для само-проверки/правки.
+ */
+function callClaude_(userMessage) {
   var cfg = getConfig_();
-  var userMessage =
-    'Родитель(и): ' + participant.parents + '\n' +
-    'Имя участника (использовать как есть, не менять форму): ' + participant.fio.split(' ')[1] + '\n' +
-    'Период отчёта: ' + period + '\n\n' +
-    'Полный транскрипт встречи (реплики спикеров):\n' + transcriptText;
-
   var resp = UrlFetchApp.fetch('https://api.anthropic.com/v1/messages', {
     method: 'post',
     contentType: 'application/json',
@@ -673,6 +671,54 @@ function writeReport_(participant, period, transcriptText) {
     throw new Error('В ответе Anthropic API нет блока text (HTTP ' + code + ', stop_reason=' + payload.stop_reason + '): ' + responseText.substring(0, 2000));
   }
   return textBlocks.map(function (b) { return b.text; }).join('\n').trim();
+}
+
+function writeReport_(participant, period, transcriptText) {
+  var userMessage =
+    'Родитель(и): ' + participant.parents + '\n' +
+    'Имя участника (использовать как есть, не менять форму): ' + participant.fio.split(' ')[1] + '\n' +
+    'Период отчёта: ' + period + '\n\n' +
+    'Полный транскрипт встречи (реплики спикеров):\n' + transcriptText;
+  return callClaude_(userMessage);
+}
+
+/**
+ * Второй проход: модель сама проверяет свой черновик по ВСЕМ правилам из
+ * системного промпта (включая п.13/13a — теоретические определения/
+ * техническая кухня правки, и п.2a — повтор фактов между блоками) и, если
+ * нужно, возвращает исправленную версию. Это компенсирует то, что даже с
+ * правильными правилами в промпте модель не всегда следует им идеально с
+ * первого раза — а в автоматическом режиме (без вашей проверки) переспросить
+ * некому, кроме самой модели.
+ */
+function reviewReport_(draftText, transcriptText) {
+  var userMessage =
+    'Вот черновик отчёта родителям, который только что был написан по ' +
+    'правилам из системного промпта, на основе этого транскрипта встречи:\n\n' +
+    '=== ТРАНСКРИПТ ===\n' + transcriptText + '\n\n' +
+    '=== ЧЕРНОВИК ОТЧЁТА ===\n' + draftText + '\n\n' +
+    'Проверь черновик пункт за пунктом по ВСЕМ правилам системного промпта, ' +
+    'особенно: нет ли теоретических определений/названий методик (п.13, ' +
+    '13a — включая примеры вроде "чем коучинг отличается от терапии и ' +
+    'менторства"); нет ли повтора одного и того же факта в разных блоках ' +
+    '(п.2a); не смешаны ли куратор и ментор (п.1a); нет ли оценочных ' +
+    'формулировок (п.9, 28); не выдано ли планируемое за уже сделанное ' +
+    '(п.10); нет ли бытовых деталей и лишней информации (п.5, 6). ' +
+    'Если черновик уже полностью соответствует правилам — верни его текст ' +
+    'БЕЗ ИЗМЕНЕНИЙ, слово в слово. Если есть нарушения — верни ' +
+    'ИСПРАВЛЕННУЮ версию отчёта целиком, в том же формате-обёртке, без ' +
+    'пояснений от себя о том, что именно исправлено — только сам текст ' +
+    'отчёта.';
+  return callClaude_(userMessage);
+}
+
+/**
+ * Черновик + самопроверка. Это то, что нужно вызывать вместо writeReport_
+ * напрямую — и в weeklyRun, и в testGenerateReport.
+ */
+function generateReport_(participant, period, transcriptText) {
+  var draft = writeReport_(participant, period, transcriptText);
+  return reviewReport_(draft, transcriptText);
 }
 
 // ===== Telegram =====
@@ -773,8 +819,8 @@ function testGenerateReport() {
     return;
   }
 
-  var reportText = writeReport_(participant, period, transcriptParts.join('\n\n'));
-  Logger.log('----- ЧЕРНОВИК ОТЧЁТА (НЕ отправлен в Telegram) -----');
+  var reportText = generateReport_(participant, period, transcriptParts.join('\n\n'));
+  Logger.log('----- ЧЕРНОВИК ОТЧЁТА (после самопроверки, НЕ отправлен в Telegram) -----');
   Logger.log(reportText);
 }
 
@@ -819,7 +865,7 @@ function weeklyRun() {
       return;
     }
 
-    var reportText = writeReport_(participant, period, transcriptParts.join('\n\n'));
+    var reportText = generateReport_(participant, period, transcriptParts.join('\n\n'));
     var header = participant.fio + ' \u2014 ' + participant.parents + ' \u2014 ' + participant.messenger;
     sendTelegramMessage_(header + '\n\n' + reportText);
     sentFor.push(participant.fio);
