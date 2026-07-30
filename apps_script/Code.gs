@@ -648,10 +648,15 @@ function writeReport_(participant, period, transcriptText) {
   if (payload.error) {
     throw new Error('Anthropic API error (HTTP ' + code + '): ' + JSON.stringify(payload.error));
   }
-  if (!payload.content || !payload.content[0] || typeof payload.content[0].text !== 'string') {
-    throw new Error('Неожиданный формат ответа Anthropic API (HTTP ' + code + '): ' + responseText.substring(0, 1000));
+  // Sonnet 5 по умолчанию может добавлять блок "thinking" перед текстом —
+  // ищем именно блок с type "text", а не полагаемся на content[0].
+  var textBlocks = (payload.content || []).filter(function (b) {
+    return b && b.type === 'text' && typeof b.text === 'string';
+  });
+  if (textBlocks.length === 0) {
+    throw new Error('В ответе Anthropic API нет блока text (HTTP ' + code + '): ' + responseText.substring(0, 1000));
   }
-  return payload.content[0].text.trim();
+  return textBlocks.map(function (b) { return b.text; }).join('\n').trim();
 }
 
 // ===== Telegram =====
