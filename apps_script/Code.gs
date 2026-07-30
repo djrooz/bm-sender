@@ -635,9 +635,21 @@ function writeReport_(participant, period, transcriptText) {
     }),
     muteHttpExceptions: true,
   });
-  var payload = JSON.parse(resp.getContentText());
+
+  var code = resp.getResponseCode();
+  var responseText = resp.getContentText();
+  var payload;
+  try {
+    payload = JSON.parse(responseText);
+  } catch (e) {
+    throw new Error('Anthropic API вернул не-JSON ответ (HTTP ' + code + '): ' + responseText.substring(0, 1000));
+  }
+
   if (payload.error) {
-    throw new Error('Anthropic API error: ' + JSON.stringify(payload.error));
+    throw new Error('Anthropic API error (HTTP ' + code + '): ' + JSON.stringify(payload.error));
+  }
+  if (!payload.content || !payload.content[0] || typeof payload.content[0].text !== 'string') {
+    throw new Error('Неожиданный формат ответа Anthropic API (HTTP ' + code + '): ' + responseText.substring(0, 1000));
   }
   return payload.content[0].text.trim();
 }
